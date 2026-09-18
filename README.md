@@ -58,7 +58,26 @@ python -m venv .venv
 .venv/Scripts/dbt docs generate && .venv/Scripts/dbt docs serve   # browsable lineage + column docs
 ```
 
-`fct_mental_health_model_input` is the table the classifier reads — see [Depression Type Classification Analysis](Depression%20Type%20Classification%20Analysis) for the Python side.
+`fct_mental_health_model_input` is the table the classifier reads — see [Depression Type Classification Analysis.ipynb](<Depression Type Classification Analysis.ipynb>) for the Python side. Its first cell reads directly from the DuckDB mart (`dbt/depression.duckdb`) rather than the raw CSV, so it depends on `dbt seed && dbt run` having been run first.
+
+### Orchestration (Apache Airflow)
+
+The manual `dbt seed && dbt run && dbt test` sequence above is also wired up as an [Airflow](https://airflow.apache.org/) DAG (`airflow/`), so the whole pipeline — data build, then docs + model training in parallel once the data passes its tests — can run as one orchestrated unit instead of by hand:
+
+```
+dbt_seed -> dbt_run -> dbt_test -> [dbt_docs_generate, train_and_evaluate_model]
+```
+
+`train_and_evaluate_model` runs the same notebook linked above headlessly (`jupyter nbconvert --execute`), so the DAG's dependency on `dbt_test` is real: the classifier only trains against dbt output that has actually passed its tests, not just data that happens to be sitting in the warehouse.
+
+Airflow doesn't support native Windows (it needs POSIX `os.register_at_fork`, confirmed by hitting that exact error trying to run it locally), so this runs via Docker:
+
+```bash
+cd airflow
+docker compose up   # first run also builds the image (dbt + the sklearn/jupyter stack on top of apache/airflow:3.3.2)
+```
+
+Then open `http://localhost:8080` (`airflow standalone` prints a generated admin password to the container logs on first run) and trigger `depression_type_classification_pipeline` manually — it has no cron schedule, since the source data is a static one-time survey export, not something that gets new rows on a recurring basis; an automatic schedule would just be decorative here. `docker compose` mounts the whole repo into the container, so DAG runs operate on the exact same `dbt/` and notebook files documented above.
 
 ## Methodology
 
@@ -94,7 +113,9 @@ Logistic Regression outperformed Naive Bayes on both metrics, and — importantl
 ├── Data/
 │   └── Mental Health Classification.csv
 ├── dbt/                                            # dbt-core + DuckDB data pipeline (see Data Pipeline above)
-├── Depression Type Classification Analysis         # Jupyter notebook: EDA, chi-square, modeling, evaluation
+├── airflow/                                        # orchestrates the dbt + training pipeline (see Orchestration above)
+├── Depression Type Classification Analysis.ipynb   # Jupyter notebook: EDA, chi-square, modeling, evaluation
+├── requirements.txt                                # deps for running the notebook itself (pandas/sklearn/duckdb/jupyter)
 ├── Predicting Depression Type...pdf                # write-up
 └── README.md
 ```

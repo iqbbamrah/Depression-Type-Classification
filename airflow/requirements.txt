@@ -1,0 +1,11 @@
+dbt-core==1.12.5
+dbt-duckdb==1.11.0
+pandas>=2.2
+numpy>=1.26
+scipy>=1.13
+scikit-learn>=1.4
+matplotlib>=3.9
+duckdb>=1.1
+nbconvert>=7.16
+ipykernel>=6.29
+jupyter-client>=8.6

@@ -1,0 +1,23 @@
+# Runs Airflow via `airflow standalone` (Airflow's own official quick-start
+# command - one process bundling the API server, scheduler, DAG processor,
+# and triggerer, backed by SQLite). Deliberately not the full
+# Postgres+multi-service production layout: this is a single-DAG portfolio
+# demo, not something meant to run in production or under real concurrent
+# load, and standalone is what Airflow itself recommends for "just try it
+# locally." A real deployment would use Postgres/MySQL and split the
+# services out (see Airflow's production docker-compose for that).
+services:
+  airflow:
+    build: .
+    container_name: depression_pipeline_airflow
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      # The whole repo, so tasks can `cd` into dbt/ and run the notebook
+      # from the repo root exactly as documented in the main README.
+      - ../:/opt/airflow/project
+    ports:
+      - "8080:8080"
+    command: standalone
