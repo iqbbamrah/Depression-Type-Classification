@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: fct_mental_health_model_input
+    description: >
+      Final model-ready table. One row per respondent, all predictors plus
+      the target column — this is what the scikit-learn classifier reads.
+    columns:
+      - name: response_id
+        data_tests:
+          - unique
+          - not_null
+      - name: depression_type
+        description: Target variable.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]

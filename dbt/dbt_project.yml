@@ -1,0 +1,54 @@
+name: 'depression_type_classification'
+version: '1.0.0'
+config-version: 2
+
+profile: 'depression_type_classification'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+seeds:
+  depression_type_classification:
+    +schema: seeds
+    mental_health_survey:
+      +column_types:
+        Gender: integer
+        Age: integer
+        Education_Level: integer
+        Employment_Status: integer
+        Depression_Type: integer
+        Symptoms: integer
+        Low_Energy: integer
+        Low_SelfEsteem: integer
+        Search_Depression_Online: integer
+        Worsening_Depression: integer
+        "Your overeating level": integer
+        "How many times you eat ": integer
+        SocialMedia_Hours: integer
+        SocialMedia_WhileEating: integer
+        Sleep_Hours: integer
+        Nervous_Level: integer
+        Depression_Score: integer
+        Coping_Methods: integer
+        Self_Harm: integer
+        Mental_Health_Support: integer
+        Suicide_Attempts: integer
+
+models:
+  depression_type_classification:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts

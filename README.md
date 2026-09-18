@@ -15,6 +15,51 @@ Depression isn't one condition — this dataset labels 12 distinct types (from "
 - 1,998 observations, 21 variables, 12 target classes (`Depression_Type`), 0 missing values, 0 duplicates.
 - Variables span numerical (age, sleep hours, social media hours), ordinal (low energy, low self-esteem, nervousness, overeating level, depression score), and nominal categorical (gender, education, employment, symptoms, coping methods, self-harm, suicide attempts, etc.) — each type analyzed with an appropriate statistical method rather than treating everything as generic numeric input.
 
+## Data Pipeline
+
+The data-prep layer that used to live in pandas notebook cells has been rebuilt as a proper [dbt-core](https://docs.getdbt.com/) project against a local [DuckDB](https://duckdb.org/) warehouse (`dbt/`) — no cloud warehouse required. Modeling and evaluation are unchanged and still run in scikit-learn; only how the model-ready table gets built has moved.
+
+```
+dbt/
+├── seeds/
+│   └── mental_health_survey.csv          # raw Mendeley export, loaded via `dbt seed`
+├── models/
+│   ├── staging/
+│   │   └── stg_mental_health__survey_responses.sql   # rename to snake_case, cast types
+│   ├── intermediate/
+│   │   ├── int_mental_health__categorical_chi_square.sql   # chi-square test of independence
+│   │   │                                                    #   vs. Depression_Type, in SQL, for
+│   │   │                                                    #   every categorical predictor the
+│   │   │                                                    #   original notebook tested
+│   │   └── int_mental_health__numeric_correlations.sql     # each predictor's correlation with
+│   │                                                        #   the target, via DuckDB's corr()
+│   └── marts/
+│       └── fct_mental_health_model_input.sql   # final model-ready table read by sklearn
+├── macros/                                # reusable chi-square / correlation SQL generators
+├── dbt_project.yml
+└── profiles.yml                           # local DuckDB target, no credentials needed
+```
+
+**Lineage:**
+
+![dbt lineage graph](dbt/docs_assets/lineage_graph.svg)
+
+**Why SQL for the chi-square/correlation step, not just feature engineering:** the original analysis used `scipy.stats.chi2_contingency` and pandas `.corr()` as *diagnostics* that informed model choice (Logistic Regression over Naive Bayes, given correlated/non-independent predictors) rather than as a feature-selection filter — no columns were actually dropped. `int_mental_health__categorical_chi_square` reproduces the same test (contingency table → expected frequencies → chi-square statistic, done via `join`s and window aggregates rather than `scipy`) so that diagnostic is now a versioned, testable SQL model instead of a one-off notebook cell. It was validated against the original notebook's findings: `gender` and `suicide_attempts` — the two variables the original analysis flagged as *not* significantly associated with the target — come out with the lowest chi-square statistics relative to their degrees of freedom here too.
+
+**Running it:**
+
+```bash
+cd dbt
+python -m venv .venv
+.venv/Scripts/pip install -r requirements.txt      # dbt-core + dbt-duckdb
+.venv/Scripts/dbt seed                              # loads the CSV into DuckDB
+.venv/Scripts/dbt run                                # builds staging -> intermediate -> marts
+.venv/Scripts/dbt test                               # 24 tests: not_null / unique / accepted_values
+.venv/Scripts/dbt docs generate && .venv/Scripts/dbt docs serve   # browsable lineage + column docs
+```
+
+`fct_mental_health_model_input` is the table the classifier reads — see [Depression Type Classification Analysis](Depression%20Type%20Classification%20Analysis) for the Python side.
+
 ## Methodology
 
 - **EDA:** class-distribution check confirmed significant imbalance across the 12 depression types — this drove the choice of evaluation metric later.
@@ -46,11 +91,11 @@ Logistic Regression outperformed Naive Bayes on both metrics, and — importantl
 
 ## Repo structure
 ```
-├── data/                      # dataset (or link, given Mendeley source/licensing)
-├── notebooks/
-│   └── depression_type_classification.ipynb
-├── report/
-│   └── depression_type_classification_report.pdf
+├── Data/
+│   └── Mental Health Classification.csv
+├── dbt/                                            # dbt-core + DuckDB data pipeline (see Data Pipeline above)
+├── Depression Type Classification Analysis         # Jupyter notebook: EDA, chi-square, modeling, evaluation
+├── Predicting Depression Type...pdf                # write-up
 └── README.md
 ```
 

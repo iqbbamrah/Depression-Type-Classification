@@ -1,0 +1,7 @@
+depression_type_classification:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: '{{ env_var("DBT_DUCKDB_PATH", "depression.duckdb") }}'
+      threads: 4

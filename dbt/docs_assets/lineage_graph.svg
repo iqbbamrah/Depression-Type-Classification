@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 260" font-family="Menlo, Consolas, monospace" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a8296"/>
+    </marker>
+  </defs>
+  <rect width="980" height="260" fill="#ffffff"/>
+
+  <!-- edges -->
+  <path d="M120,130 L190,130" stroke="#5a8296" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M420,130 L470,130 L470,60 L530,60"  stroke="#5a8296" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M420,130 L470,130 L470,130 L530,130" stroke="#5a8296" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M420,130 L470,130 L470,200 L530,200" stroke="#5a8296" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M760,60 L800,60 L800,130 L840,130" stroke="#5a8296" stroke-width="2" fill="none" marker-end="url(#arrow)" stroke-dasharray="3,3"/>
+  <path d="M760,200 L800,200 L800,130 L840,130" stroke="#5a8296" stroke-width="2" fill="none" marker-end="url(#arrow)" stroke-dasharray="3,3"/>
+
+  <!-- seed -->
+  <rect x="10" y="108" width="110" height="44" rx="8" fill="#1e5566"/>
+  <text x="65" y="135" fill="#ffffff" text-anchor="middle">mental_health</text>
+  <text x="65" y="148" fill="#ffffff" text-anchor="middle" font-size="10">_survey (seed)</text>
+
+  <!-- staging -->
+  <rect x="190" y="100" width="230" height="60" rx="8" fill="#1e6f8a"/>
+  <text x="305" y="126" fill="#ffffff" text-anchor="middle" font-size="11">stg_mental_health__</text>
+  <text x="305" y="142" fill="#ffffff" text-anchor="middle" font-size="11">survey_responses</text>
+
+  <!-- intermediate: chi-square -->
+  <rect x="530" y="32" width="230" height="56" rx="8" fill="#2f8fae"/>
+  <text x="645" y="55" fill="#ffffff" text-anchor="middle" font-size="10.5">int_mental_health__</text>
+  <text x="645" y="70" fill="#ffffff" text-anchor="middle" font-size="10.5">categorical_chi_square</text>
+
+  <!-- marts -->
+  <rect x="530" y="102" width="230" height="56" rx="8" fill="#d9622b"/>
+  <text x="645" y="125" fill="#ffffff" text-anchor="middle" font-size="10.5">fct_mental_health_</text>
+  <text x="645" y="140" fill="#ffffff" text-anchor="middle" font-size="10.5">model_input</text>
+
+  <!-- intermediate: correlations -->
+  <rect x="530" y="172" width="230" height="56" rx="8" fill="#2f8fae"/>
+  <text x="645" y="195" fill="#ffffff" text-anchor="middle" font-size="10.5">int_mental_health__</text>
+  <text x="645" y="210" fill="#ffffff" text-anchor="middle" font-size="10.5">numeric_correlations</text>
+
+  <!-- sklearn -->
+  <rect x="840" y="105" width="130" height="50" rx="8" fill="#3c3c3c"/>
+  <text x="905" y="126" fill="#ffffff" text-anchor="middle" font-size="10.5">scikit-learn</text>
+  <text x="905" y="141" fill="#ffffff" text-anchor="middle" font-size="10.5">classifier (Python)</text>
+
+  <text x="10" y="20" fill="#333333" font-size="13" font-weight="bold">dbt lineage — depression_type_classification (seed -&gt; staging -&gt; intermediate -&gt; marts -&gt; Python)</text>
+</svg>

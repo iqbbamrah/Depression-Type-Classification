@@ -1,0 +1,57 @@
+version: 2
+
+models:
+  - name: stg_mental_health__survey_responses
+    description: >
+      One row per survey respondent. Light cleaning only — snake_case column
+      names and explicit integer casts — from the mental_health_survey seed.
+    columns:
+      - name: response_id
+        description: Surrogate key generated at staging time (row_number over the seed).
+        data_tests:
+          - unique
+          - not_null
+      - name: gender
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: age
+        data_tests:
+          - not_null
+      - name: education_level
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1, 2, 3]
+      - name: employment_status
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1, 2, 3, 4]
+      - name: depression_type
+        description: Target variable — one of 12 depression subtypes.
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+      - name: search_depression_online
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: worsening_depression
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: self_harm
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: mental_health_support
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
