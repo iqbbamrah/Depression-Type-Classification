@@ -35,10 +35,10 @@ The project was later extended with a tested data pipeline (dbt + DuckDB) and or
 | Layer | What's checked |
 |---|---|
 | Seed | Row volume (1,900–2,100), target never null |
-| Staging | All 22 columns `not_null` and range-checked against the dataset codebook (`accepted_values`, plus a custom `value_between` test); `response_id` is an md5 of all raw columns, so its `unique` test also catches duplicate rows |
-| Intermediate | Correlations non-null and within [-1, 1]; chi-square statistics non-negative with ≥1 degree of freedom |
+| Staging | All 22 columns `not_null` and range-checked against the dataset codebook (`accepted_values`, plus a custom `value_between` test). `response_id` is an md5 of all raw columns, so its `unique` test also catches duplicate rows |
+| Intermediate | Correlations non-null and within [-1, 1], and chi-square statistics non-negative with ≥1 degree of freedom |
 | Mart | **Enforced model contract** (dbt refuses to build if a column is missing, renamed, or changes type), no rows lost between staging and mart, and all 12 classes present with ≥10 rows so the stratified split stays valid |
-| Mart (warning) | Class imbalance > 20x: fires by design (627 vs. 21, ~30x) as a reminder of why Macro F1 is the headline metric; reported but never blocks training |
+| Mart (warning) | Class imbalance > 20x: fires by design (627 vs. 21, ~30x) as a reminder of why Macro F1 is the headline metric. It's reported but never blocks training |
 
 Failing rows are stored in DuckDB (`main_dbt_test__audit`) for debugging.
 
@@ -71,7 +71,7 @@ Logistic Regression outperformed Naive Bayes on both metrics, and the Macro F1 g
 
 - **The diagnostics predicted the modeling outcome before any model was fit.** Predictors were shown to be correlated, so Naive Bayes' independence assumption was already known to be a poor fit. The model comparison confirmed a hypothesis rather than being a blind horse race.
 - **Macro F1 vs. accuracy mattered.** On an imbalanced 12-class target, accuracy alone would have overstated how well the models handle rare depression types.
-- **The signal is multi-dimensional.** Some intuitive predictors (sleep hours) were weak on their own; the model's signal came from a mix of psychological state and behavioural/contextual variables.
+- **The signal is multi-dimensional.** Some intuitive predictors (sleep hours) were weak on their own. The model's signal came from a mix of psychological state and behavioural/contextual variables.
 - **Feature importance ≠ causation.** Logistic regression coefficients shouldn't be read as causal drivers of depression type.
 - **Testing the data is part of the model.** Moving data prep into a tested dbt pipeline means bad data (out-of-range values, duplicates, a missing class, a schema change) stops the pipeline before training instead of silently changing the results.
 - This is an educational analysis of an anonymized academic dataset. It is not a diagnostic tool and should not be read as clinical guidance.
@@ -85,7 +85,7 @@ Logistic Regression outperformed Naive Bayes on both metrics, and the Macro F1 g
    .venv/Scripts/dbt build                         # seed -> staging -> intermediate -> marts, with all 57 tests
    ```
 2. **Train and evaluate the model:** from the repo root, `pip install -r requirements.txt`, then run [`Depression Type Classification Analysis.ipynb`](<Depression Type Classification Analysis.ipynb>). It reads the mart from `dbt/depression.duckdb`, so step 1 must run first.
-3. **Or run the whole pipeline in Airflow** (needs Docker; on Windows, Docker Desktop with WSL 2): from `airflow/`, run `docker compose up --build`, open `http://localhost:8080` (the admin password is printed in the container logs on first run), and trigger `depression_type_classification_pipeline`.
+3. **Or run the whole pipeline in Airflow** (needs Docker, which on Windows means Docker Desktop with WSL 2): from `airflow/`, run `docker compose up --build`, open `http://localhost:8080` (the admin password is printed in the container logs on first run), and trigger `depression_type_classification_pipeline`.
 
 ## Repo structure
 
