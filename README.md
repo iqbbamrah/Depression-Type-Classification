@@ -1,94 +1,59 @@
-# Depression-Type-Classification
-Project completed for Statistics for Data Science Course in the University of Waterloo WATSPEED Data Science Certificate Program.
-
 # Predicting Depression Type from Lifestyle & Behavioural Factors
 
-Multi-class classification of depression type (12 classes) from psychological, behavioural, demographic, and support-related survey variables, with a focus on choosing the right evaluation metric and model for imbalanced, non-independent predictors.
+**Team (Group 9, Statistics for Data Science course, University of Waterloo WATSPEED Data Science Certificate):** Nan Zhou, Richard Sarzynski, Emily Gomolka, Bruno Pinto, Parmis Jahanbani, Iqbal Bamrah
 
 ## Problem
 
-Depression isn't one condition. This dataset labels 12 distinct types (from "no clinically significant" through major, seasonal, postpartum, and psychotic depression). The goal was to test whether lifestyle and behavioral survey data (sleep, social media use, coping methods, support access, etc.) combined with psychological indicators could predict which type a respondent falls into. Just as important was to reason carefully about *why* one modeling approach would outperform another given the structure of the data, rather than just reporting whichever model scored higher.
+Depression isn't one condition: this dataset labels 12 distinct types, from "no clinically significant" through mild, moderate, and severe depression to dysthymia, seasonal affective, postpartum, bipolar-related, reactive, and psychotic depression. The goal was to test whether lifestyle and behavioural survey data (sleep, social media use, coping methods, support access, etc.) combined with psychological indicators could predict which type a respondent falls into. Just as important was reasoning carefully about *why* one modeling approach would outperform another given the structure of the data, rather than just reporting whichever model scored higher.
+
+The project was later extended with a tested data pipeline (dbt + DuckDB) and orchestration (Apache Airflow), so the classifier only ever trains on data that has passed quality checks.
 
 ## Data
 
 - **Source:** [Mendeley Data: Mental Health Dataset (Choudhury, 2022)](https://data.mendeley.com/datasets/xppzm3kv9g/2)
-- 1,998 observations, 21 variables, 12 target classes (`Depression_Type`), 0 missing values, 0 duplicates.
-- Variables span numerical (age, sleep hours, social media hours), ordinal (low energy, low self-esteem, nervousness, overeating level, depression score), and nominal categorical (gender, education, employment, symptoms, coping methods, self-harm, suicide attempts, etc.). Each type is analyzed with an appropriate statistical method rather than treating everything as generic numeric input.
-
-## Data Pipeline
-
-The data-prep layer that used to live in pandas notebook cells has been rebuilt as a proper [dbt-core](https://docs.getdbt.com/) project against a local [DuckDB](https://duckdb.org/) warehouse (`dbt/`), with no cloud warehouse required. Modeling and evaluation are unchanged and still run in scikit-learn. Only how the model-ready table gets built has moved.
-
-```
-dbt/
-├── seeds/
-│   └── mental_health_survey.csv          # raw Mendeley export, loaded via `dbt seed`
-├── models/
-│   ├── staging/
-│   │   └── stg_mental_health__survey_responses.sql   # rename to snake_case, cast types
-│   ├── intermediate/
-│   │   ├── int_mental_health__categorical_chi_square.sql   # chi-square test of independence
-│   │   │                                                    #   vs. Depression_Type, in SQL, for
-│   │   │                                                    #   every categorical predictor the
-│   │   │                                                    #   original notebook tested
-│   │   └── int_mental_health__numeric_correlations.sql     # each predictor's correlation with
-│   │                                                        #   the target, via DuckDB's corr()
-│   └── marts/
-│       └── fct_mental_health_model_input.sql   # final model-ready table read by sklearn
-├── macros/                                # reusable chi-square / correlation SQL generators
-├── dbt_project.yml
-└── profiles.yml                           # local DuckDB target, no credentials needed
-```
-
-**Lineage:**
-
-![dbt lineage graph](dbt/docs_assets/lineage_graph.svg)
-
-**Why SQL for the chi-square/correlation step, not just feature engineering:** the original analysis used `scipy.stats.chi2_contingency` and pandas `.corr()` as *diagnostics* that informed model choice (Logistic Regression over Naive Bayes, given correlated/non-independent predictors) rather than as a feature-selection filter, and no columns were actually dropped. `int_mental_health__categorical_chi_square` reproduces the same test (contingency table → expected frequencies → chi-square statistic, done via `join`s and window aggregates rather than `scipy`) so that diagnostic is now a versioned, testable SQL model instead of a one-off notebook cell. It was validated against the original notebook's findings: `gender` and `suicide_attempts`, the two variables the original analysis flagged as *not* significantly associated with the target, come out with the lowest chi-square statistics relative to their degrees of freedom here too.
-
-**Running it:**
-
-```bash
-cd dbt
-python -m venv .venv
-.venv/Scripts/pip install -r requirements.txt      # dbt-core + dbt-duckdb
-.venv/Scripts/dbt seed                              # loads the CSV into DuckDB
-.venv/Scripts/dbt run                                # builds staging -> intermediate -> marts
-.venv/Scripts/dbt test                               # 24 tests: not_null / unique / accepted_values
-.venv/Scripts/dbt docs generate && .venv/Scripts/dbt docs serve   # browsable lineage + column docs
-```
-
-`fct_mental_health_model_input` is the table the classifier reads. See [Depression Type Classification Analysis.ipynb](<Depression Type Classification Analysis.ipynb>) for the Python side. Its first cell reads directly from the DuckDB mart (`dbt/depression.duckdb`) rather than the raw CSV, so it depends on `dbt seed && dbt run` having been run first.
-
-### Orchestration (Apache Airflow)
-
-The manual `dbt seed && dbt run && dbt test` sequence above is also wired up as an [Airflow](https://airflow.apache.org/) DAG (`airflow/`), so the whole pipeline (data build, then docs + model training in parallel once the data passes its tests) can run as one orchestrated unit instead of by hand:
-
-```
-dbt_seed -> dbt_run -> dbt_test -> [dbt_docs_generate, train_and_evaluate_model]
-```
-
-`train_and_evaluate_model` runs the same notebook linked above headlessly (`jupyter nbconvert --execute`), so the DAG's dependency on `dbt_test` is real: the classifier only trains against dbt output that has actually passed its tests, not just data that happens to be sitting in the warehouse.
-
-Airflow doesn't support native Windows (it needs POSIX `os.register_at_fork`, confirmed by hitting that exact error trying to run it locally), so this runs via Docker:
-
-```bash
-cd airflow
-docker compose up   # first run also builds the image (dbt + the sklearn/jupyter stack on top of apache/airflow:3.3.2)
-```
-
-Then open `http://localhost:8080` (`airflow standalone` prints a generated admin password to the container logs on first run) and trigger `depression_type_classification_pipeline` manually. It has no cron schedule, since the source data is a static one-time survey export, not something that gets new rows on a recurring basis, so an automatic schedule would just be decorative here. `docker compose` mounts the whole repo into the container, so DAG runs operate on the exact same `dbt/` and notebook files documented above.
+- 1,998 observations, 21 variables, 12 target classes (`Depression_Type`), 0 missing values, 0 duplicate rows.
+- Variables span numerical (age, sleep hours, social media hours), ordinal (low energy, low self-esteem, nervousness, overeating level, depression score), and nominal categorical (gender, education, employment, symptoms, coping methods, self-harm, suicide attempts, etc.). Each type is analyzed with an appropriate statistical method rather than treated as generic numeric input.
+- **The target is heavily imbalanced:** the largest class (reactive depression) has 627 respondents and the smallest (bipolar-related episode) has 21.
 
 ## Methodology
 
-- **EDA:** class-distribution check confirmed significant imbalance across the 12 depression types, which drove the choice of evaluation metric later.
-- **Categorical variables:** tested against the target using **Chi-square tests of independence**. Nearly all categorical variables (Symptoms, Coping_Methods, Employment_Status, Education_Level, etc.) showed statistically significant associations (p < 0.001). Gender and Suicide_Attempts did not.
-- **Numerical/ordinal variables:** correlation analysis showed several psychological/behavioral predictors were moderately inter-correlated (i.e., not independent), which directly informed model choice (see below).
-- **Modeling:** 80/20 stratified train/test split (preserves class proportions in an imbalanced multi-class problem). Compared:
-  - **Logistic Regression** (standardized via a pipeline), which can model relationships between correlated predictors.
-  - **Gaussian Naive Bayes**, which assumes predictor independence, used as a contrasting baseline to test whether that assumption holds up in this data.
-- **Evaluation:** both accuracy and **Macro F1-score**. Macro F1 was treated as the primary metric because it weights all 12 classes equally, which matters when several classes are rare.
-- **Tools:** Python, pandas, scikit-learn (`LogisticRegression`, `GaussianNB`, `Pipeline`, `StandardScaler`, `train_test_split`), SciPy (`stats` for chi-square testing), matplotlib.
+**Statistical analysis and modeling**
+- **EDA:** a class-distribution check confirmed significant imbalance across the 12 types, which drove the choice of evaluation metric.
+- **Categorical variables:** tested against the target with **chi-square tests of independence**.
+- **Numerical/ordinal variables:** correlation analysis showed several psychological and behavioural predictors were moderately inter-correlated, i.e. not independent. This directly informed model choice.
+- **Modeling:** 80/20 stratified train/test split (preserves class proportions). Compared **Logistic Regression** (standardized in a pipeline), which can handle correlated predictors, against **Gaussian Naive Bayes**, which assumes predictor independence, as a contrasting baseline to test whether that assumption holds.
+- **Evaluation:** accuracy and **Macro F1-score**, with Macro F1 as the primary metric because it weights all 12 classes equally, which matters when several classes are rare.
+
+**Data pipeline (dbt + DuckDB)**
+- Data prep is a [dbt-core](https://docs.getdbt.com/) project on a local [DuckDB](https://duckdb.org/) warehouse, with layers for raw seed → staging (rename and type) → intermediate (diagnostics) → mart (the model-ready table the notebook reads).
+- The chi-square tests and target correlations are reproduced in SQL as intermediate models, so those diagnostics are versioned and testable instead of one-off notebook cells. The SQL chi-square agrees with the original analysis: `gender` and `suicide_attempts` have the lowest statistics relative to their degrees of freedom.
+
+![dbt lineage graph](dbt/docs_assets/lineage_graph.svg)
+
+**Data quality: 57 tests on every build (56 blocking, 1 warning)**
+
+| Layer | What's checked |
+|---|---|
+| Seed | Row volume (1,900–2,100), target never null |
+| Staging | All 22 columns `not_null` and range-checked against the dataset codebook (`accepted_values`, plus a custom `value_between` test). `response_id` is an md5 of all raw columns, so its `unique` test also catches duplicate rows |
+| Intermediate | Correlations non-null and within [-1, 1], and chi-square statistics non-negative with ≥1 degree of freedom |
+| Mart | **Enforced model contract** (dbt refuses to build if a column is missing, renamed, or changes type), no rows lost between staging and mart, and all 12 classes present with ≥10 rows so the stratified split stays valid |
+| Mart (warning) | Class imbalance > 20x: fires by design (627 vs. 21, ~30x) as a reminder of why Macro F1 is the headline metric. It's reported but never blocks training |
+
+Failing rows are stored in DuckDB (`main_dbt_test__audit`) for debugging.
+
+**Orchestration (Apache Airflow)**
+
+```
+dbt_build_seeds -> dbt_build_staging -> dbt_build_intermediate -> dbt_build_marts
+  -> quality_report -> train_and_evaluate_model -> dbt_docs_generate
+```
+
+- Each layer is built *and tested* before the next one starts, so bad data stops at the layer where it's found.
+- `quality_report` runs even when a layer fails, lists every non-passing test by name, and blocks training on any blocking failure.
+- Tasks run strictly in sequence because DuckDB allows only one writer per database file. Airflow runs in Docker, since it doesn't support native Windows.
+
+**Tools:** Python, pandas, scikit-learn (`LogisticRegression`, `GaussianNB`, `Pipeline`, `StandardScaler`), SciPy, matplotlib, dbt-core, DuckDB, Apache Airflow, Docker.
 
 ## Results
 
@@ -97,33 +62,53 @@ Then open `http://localhost:8080` (`airflow standalone` prints a generated admin
 | **Logistic Regression** | **0.7175** | **0.8659** |
 | Naive Bayes | 0.5325 | 0.7563 |
 
-Logistic Regression outperformed Naive Bayes on both metrics. Importantly, the Macro F1 gap shows the improvement wasn't just from getting majority classes right. It held up across the rarer depression types too.
+Logistic Regression outperformed Naive Bayes on both metrics, and the Macro F1 gap shows the improvement wasn't just from getting majority classes right: it held up across the rarer depression types too.
 
-**Top predictive signals** (by standardized coefficient magnitude): `SocialMedia_WhileEating`, `Low_SelfEsteem`, `Search_Depression_Online`, `Symptoms`, `Education_Level`, `Nervous_Level`: a mix of psychological and contextual/behavioral variables, not just one category.
+- **Chi-square tests:** nearly all categorical variables (Symptoms, Coping_Methods, Employment_Status, Education_Level, etc.) were significantly associated with depression type (p < 0.001). Gender and Suicide_Attempts were not.
+- **Top predictive signals** (by standardized coefficient magnitude): `SocialMedia_WhileEating`, `Low_SelfEsteem`, `Search_Depression_Online`, `Symptoms`, `Education_Level`, `Nervous_Level`, a mix of psychological and contextual/behavioural variables.
 
 ## Key takeaways
 
-- The correlation and chi-square results predicted the modeling outcome *before* any model was fit: since predictors were shown to be correlated/non-independent, Naive Bayes' core assumption was already known to be a poor fit for this data, so the model comparison confirmed a hypothesis rather than being a blind horse race.
-- Macro F1 vs. accuracy mattered in practice: on this imbalanced 12-class target, accuracy alone would have overstated how well the models handle rare depression types.
-- Some intuitive predictors (sleep hours) were weak on their own. The model's actual signal came from a genuine mix of psychological state variables and contextual/behavioral ones, supporting the paper's framing of depression classification as multi-dimensional, not driven by any single factor.
-- Feature importance ≠ causation. This is flagged explicitly, since interpreting logistic regression coefficients as causal drivers of depression type would overstate what this analysis supports.
+- **The diagnostics predicted the modeling outcome before any model was fit.** Predictors were shown to be correlated, so Naive Bayes' independence assumption was already known to be a poor fit. The model comparison confirmed a hypothesis rather than being a blind horse race.
+- **Macro F1 vs. accuracy mattered.** On an imbalanced 12-class target, accuracy alone would have overstated how well the models handle rare depression types.
+- **The signal is multi-dimensional.** Some intuitive predictors (sleep hours) were weak on their own. The model's signal came from a mix of psychological state and behavioural/contextual variables.
+- **Feature importance ≠ causation.** Logistic regression coefficients shouldn't be read as causal drivers of depression type.
+- **Testing the data is part of the model.** Moving data prep into a tested dbt pipeline means bad data (out-of-range values, duplicates, a missing class, a schema change) stops the pipeline before training instead of silently changing the results.
+- This is an educational analysis of an anonymized academic dataset. It is not a diagnostic tool and should not be read as clinical guidance.
+
+## How to run
+
+1. **Build and test the data layer**, from `dbt/`:
+   ```bash
+   python -m venv .venv
+   .venv/Scripts/pip install -r requirements.txt   # dbt-core + dbt-duckdb
+   .venv/Scripts/dbt build                         # seed -> staging -> intermediate -> marts, with all 57 tests
+   ```
+2. **Train and evaluate the model:** from the repo root, `pip install -r requirements.txt`, then run [`Depression Type Classification Analysis.ipynb`](<Depression Type Classification Analysis.ipynb>). It reads the mart from `dbt/depression.duckdb`, so step 1 must run first.
+3. **Or run the whole pipeline in Airflow** (needs Docker, which on Windows means Docker Desktop with WSL 2): from `airflow/`, run `docker compose up --build`, open `http://localhost:8080` (the admin password is printed in the container logs on first run), and trigger `depression_type_classification_pipeline`.
 
 ## Repo structure
+
 ```
 ├── Data/
 │   └── Mental Health Classification.csv
-├── dbt/                                            # dbt-core + DuckDB data pipeline (see Data Pipeline above)
-├── airflow/                                        # orchestrates the dbt + training pipeline (see Orchestration above)
-├── Depression Type Classification Analysis.ipynb   # Jupyter notebook: EDA, chi-square, modeling, evaluation
-├── requirements.txt                                # deps for running the notebook itself (pandas/sklearn/duckdb/jupyter)
+├── dbt/
+│   ├── seeds/                  # raw survey CSV, loaded into DuckDB
+│   ├── models/
+│   │   ├── staging/            # stg_mental_health__survey_responses: snake_case names, types, stable key
+│   │   ├── intermediate/       # chi-square and correlation diagnostics in SQL
+│   │   └── marts/              # fct_mental_health_model_input: contract-enforced table the notebook reads
+│   ├── macros/                 # reusable chi-square / correlation SQL generators
+│   ├── tests/                  # custom generic tests + singular business-logic tests
+│   ├── docs_assets/            # lineage graph
+│   ├── dbt_project.yml
+│   └── profiles.yml            # local DuckDB target, no credentials needed
+├── airflow/
+│   ├── dags/depression_type_classification_dag.py
+│   ├── Dockerfile
+│   └── docker-compose.yaml
+├── Depression Type Classification Analysis.ipynb   # EDA, chi-square, modeling, evaluation
 ├── Predicting Depression Type...pdf                # write-up
+├── requirements.txt
 └── README.md
 ```
-
-## Possible extensions
-- Test regularized multinomial logistic regression (L1/L2) or a gradient-boosted classifier to see if performance improves further, and whether L1 regularization sharpens the feature-importance picture.
-- Per-class error analysis on the confusion matrix (e.g. classes 2, 5, and 9 show more off-diagonal confusion) to understand which depression types are hardest to separate and why.
-- SHAP values instead of raw standardized coefficients, for a more robust, interaction-aware view of feature importance.
-
----
-*This project analyzes depression classification for educational/research purposes using an anonymized academic dataset. It is not a diagnostic tool and should not be interpreted as clinical guidance.*

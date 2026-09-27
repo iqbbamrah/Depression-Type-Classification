@@ -1,0 +1,27 @@
+version: 2
+
+models:
+  - name: int_mental_health__categorical_chi_square
+    description: >
+      Chi-square test of independence against depression_type for each
+      categorical predictor - the SQL equivalent of scipy.stats.chi2_contingency
+      from the original notebook. A documented diagnostic, not a feature filter.
+    columns:
+      - name: variable
+        data_tests:
+          - unique
+          - not_null
+      - name: chi_square_statistic
+      - name: degrees_of_freedom
+      - name: n_observations
+
+  - name: int_mental_health__numeric_correlations
+    description: >
+      Each predictor's Pearson correlation with depression_type (DuckDB corr()),
+      the target row of the original notebook's pandas correlation matrix.
+    columns:
+      - name: variable
+        data_tests:
+          - unique
+          - not_null
+      - name: correlation_with_target

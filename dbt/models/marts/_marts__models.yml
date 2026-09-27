@@ -4,15 +4,106 @@ models:
   - name: fct_mental_health_model_input
     description: >
       Final model-ready table. One row per respondent, all predictors plus
-      the target column — this is what the scikit-learn classifier reads.
+      the target column - this is what the scikit-learn classifier reads.
+      The enforced contract means dbt refuses to build it if a column goes
+      missing, is renamed, or changes type, so the notebook can't silently
+      receive a different schema than it expects.
+    config:
+      contract:
+        enforced: true
     columns:
       - name: response_id
+        data_type: varchar
+        constraints:
+          - type: not_null
         data_tests:
           - unique
-          - not_null
+      - name: gender
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: age
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: education_level
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: employment_status
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: symptoms
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: low_energy
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: low_self_esteem
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: search_depression_online
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: worsening_depression
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: overeating_level
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: eating_frequency
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: social_media_hours
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: social_media_while_eating
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: sleep_hours
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: nervous_level
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: depression_score
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: coping_methods
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: self_harm
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: mental_health_support
+        data_type: integer
+        constraints:
+          - type: not_null
+      - name: suicide_attempts
+        data_type: integer
+        constraints:
+          - type: not_null
       - name: depression_type
+        data_type: integer
         description: Target variable.
+        constraints:
+          - type: not_null
         data_tests:
-          - not_null
           - accepted_values:
-              values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+              arguments:
+                values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]

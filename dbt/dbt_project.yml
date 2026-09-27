@@ -52,3 +52,9 @@ models:
     marts:
       +materialized: table
       +schema: marts
+
+data_tests:
+  depression_type_classification:
+    # Failing rows land in main_dbt_test__audit.<test_name>, so a red test
+    # can be debugged with a SELECT instead of re-running its SQL by hand.
+    +store_failures: true
