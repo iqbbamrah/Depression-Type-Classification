@@ -7,7 +7,18 @@ with source as (
 renamed as (
 
     select
-        row_number() over () as response_id,
+        -- Deterministic surrogate key: the same row gets the same id on every
+        -- run (row_number() over () with no ORDER BY doesn't guarantee that).
+        -- Hashing every raw column also makes the unique test on this key a
+        -- duplicate-row check.
+        md5(concat_ws('|',
+            "Gender", "Age", "Education_Level", "Employment_Status", "Depression_Type",
+            "Symptoms", "Low_Energy", "Low_SelfEsteem", "Search_Depression_Online",
+            "Worsening_Depression", "Your overeating level", "How many times you eat ",
+            "SocialMedia_Hours", "SocialMedia_WhileEating", "Sleep_Hours", "Nervous_Level",
+            "Depression_Score", "Coping_Methods", "Self_Harm", "Mental_Health_Support",
+            "Suicide_Attempts"
+        )) as response_id,
         cast("Gender" as integer)                      as gender,
         cast("Age" as integer)                          as age,
         cast("Education_Level" as integer)              as education_level,

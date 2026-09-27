@@ -36,6 +36,9 @@ dbt/
 │   └── marts/
 │       └── fct_mental_health_model_input.sql   # final model-ready table read by sklearn
 ├── macros/                                # reusable chi-square / correlation SQL generators
+├── tests/
+│   ├── generic/                           # custom reusable tests: value_between, row_count_between
+│   └── assert_*.sql / warn_*.sql          # singular business-logic tests (see Data quality below)
 ├── dbt_project.yml
 └── profiles.yml                           # local DuckDB target, no credentials needed
 ```
@@ -52,23 +55,39 @@ dbt/
 cd dbt
 python -m venv .venv
 .venv/Scripts/pip install -r requirements.txt      # dbt-core + dbt-duckdb
-.venv/Scripts/dbt seed                              # loads the CSV into DuckDB
-.venv/Scripts/dbt run                                # builds staging -> intermediate -> marts
-.venv/Scripts/dbt test                               # 24 tests: not_null / unique / accepted_values
+.venv/Scripts/dbt build                              # seed -> staging -> intermediate -> marts, testing each node before anything downstream of it
 .venv/Scripts/dbt docs generate && .venv/Scripts/dbt docs serve   # browsable lineage + column docs
 ```
 
-`fct_mental_health_model_input` is the table the classifier reads — see [Depression Type Classification Analysis.ipynb](<Depression Type Classification Analysis.ipynb>) for the Python side. Its first cell reads directly from the DuckDB mart (`dbt/depression.duckdb`) rather than the raw CSV, so it depends on `dbt seed && dbt run` having been run first.
+`fct_mental_health_model_input` is the table the classifier reads — see [Depression Type Classification Analysis.ipynb](<Depression Type Classification Analysis.ipynb>) for the Python side. Its first cell reads directly from the DuckDB mart (`dbt/depression.duckdb`) rather than the raw CSV, so it depends on `dbt build` having been run first.
+
+### Data quality
+
+57 tests run on every build (56 blocking, 1 warning). `dbt build` stops at the first failing layer, so bad data never reaches the mart the model trains on:
+
+| Layer | What's checked |
+|---|---|
+| Seed | Row volume (1,900–2,100), target never null |
+| Staging | Every one of 22 columns `not_null` and range-checked against the dataset's codebook (`accepted_values` for code sets, custom `value_between` for wider scales); `response_id` is an md5 of all raw columns, so its `unique` test doubles as a duplicate-row check |
+| Intermediate | Correlations non-null and within [-1, 1]; chi-square statistics non-negative with ≥1 degree of freedom |
+| Mart | **Enforced model contract** — dbt refuses to build the table if a column is missing, renamed, or changes type, so the notebook can't silently receive a different schema. Plus: no rows lost between staging and mart, and all 12 classes present with ≥10 rows (so the stratified 80/20 split stays valid) |
+| Mart (warn) | Class-imbalance ratio > 20x — fires on this dataset (627 vs 21 rows, ~30x) by design, as a reminder of why Macro F1 is the headline metric; reported but never blocks training |
+
+`store_failures` is on, so any failing test's offending rows can be inspected directly in DuckDB at `main_dbt_test__audit.<test_name>`.
 
 ### Orchestration (Apache Airflow)
 
-The manual `dbt seed && dbt run && dbt test` sequence above is also wired up as an [Airflow](https://airflow.apache.org/) DAG (`airflow/`), so the whole pipeline — data build, then docs + model training in parallel once the data passes its tests — can run as one orchestrated unit instead of by hand:
+The pipeline is also orchestrated as an [Airflow](https://airflow.apache.org/) DAG (`airflow/`), with a data-quality gate at every layer:
 
 ```
-dbt_seed -> dbt_run -> dbt_test -> [dbt_docs_generate, train_and_evaluate_model]
+dbt_build_seeds -> dbt_build_staging -> dbt_build_intermediate -> dbt_build_marts
+  -> quality_report -> train_and_evaluate_model -> dbt_docs_generate
 ```
 
-`train_and_evaluate_model` runs the same notebook linked above headlessly (`jupyter nbconvert --execute`), so the DAG's dependency on `dbt_test` is real: the classifier only trains against dbt output that has actually passed its tests, not just data that happens to be sitting in the warehouse.
+- **Layer-by-layer gates:** each `dbt_build_<layer>` task builds *and tests* one layer (`dbt build --indirect-selection buildable`, so cross-layer tests like "no rows lost staging → mart" wait until both sides exist). A failure stops the run at that layer — a bad staging row means intermediate and marts never build.
+- **`quality_report`:** runs even when a layer failed (`trigger_rule="all_done"`), reads every layer's `run_results.json`, and logs pass/warn/fail counts plus each non-passing test by name. It fails the run on any blocking failure; warn-severity tests are reported but don't block.
+- **`train_and_evaluate_model`** runs the notebook headlessly (`jupyter nbconvert --execute`) only after `quality_report` passes, so the classifier only ever trains on data that passed every test.
+- **Strictly linear on purpose:** DuckDB allows only one read-write process per database file, so no two tasks touch it at once.
 
 Airflow doesn't support native Windows (it needs POSIX `os.register_at_fork`, confirmed by hitting that exact error trying to run it locally), so this runs via Docker:
 

@@ -1,0 +1,18 @@
+version: 2
+
+seeds:
+  - name: mental_health_survey
+    description: >
+      Raw survey export from the Mendeley Mental Health Dataset (Choudhury, 2022).
+      1,998 respondents, already numerically encoded at the source. Kept exactly
+      as delivered - all renaming and typing happens in staging.
+    data_tests:
+      - row_count_between:
+          arguments:
+            min_rows: 1900
+            max_rows: 2100
+    columns:
+      - name: Depression_Type
+        description: Target variable - one of 12 depression subtypes (0-11).
+        data_tests:
+          - not_null
