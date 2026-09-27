@@ -120,10 +120,5 @@ Logistic Regression outperformed Naive Bayes on both metrics. Importantly, the M
 └── README.md
 ```
 
-## Possible extensions
-- Test regularized multinomial logistic regression (L1/L2) or a gradient-boosted classifier to see if performance improves further, and whether L1 regularization sharpens the feature-importance picture.
-- Per-class error analysis on the confusion matrix (e.g. classes 2, 5, and 9 show more off-diagonal confusion) to understand which depression types are hardest to separate and why.
-- SHAP values instead of raw standardized coefficients, for a more robust, interaction-aware view of feature importance.
-
 ---
 *This project analyzes depression classification for educational/research purposes using an anonymized academic dataset. It is not a diagnostic tool and should not be interpreted as clinical guidance.*
